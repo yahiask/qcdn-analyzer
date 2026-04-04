@@ -2,63 +2,77 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from collections import Counter
-from scipy.stats import chi2_contingency, entropy
+from scipy.stats import entropy
 import networkx as nx
 import matplotlib.pyplot as plt
 import seaborn as sns
 import re
 
 # -------------------------
-# Title
+# واجهة
 # -------------------------
-st.title("QCDN Analyzer - Qur'anic Cognitive Network")
+st.title("QCDN Analyzer - Qur'anic Cognitive Network (Fixed Version)")
 
 # -------------------------
-# Lexicon (قابل للتوسيع)
+# Lexicon (محسن)
 # -------------------------
-Z_words = ["إذ","ثم","لما","حين","بعد","قبل","يوم"]
-V_words = ["خير","شر","حب","بغض","حزن","فرح","حسد","غضب"]
-K_words = ["علم","يعلم","رأى","يرى","رؤيا","تأويل","يعقل"]
-P_words = ["قال","أمر","فعل","ذهب","جاء","أرسل","دخل"]
-T_words = ["فاز","نجا","خسر","أصبح","عاد","كان"]
-
 lexicon = {
-    "Z": Z_words,
-    "V": V_words,
-    "K": K_words,
-    "P": P_words,
-    "T": T_words
+    "Z": ["اذ","ثم","لما","حين","بعد","قبل","يوم"],
+    "V": ["خير","شر","حب","بغض","حزن","فرح","حسد","غضب"],
+    "K": ["علم","يعلم","رأى","يرى","رؤيا","تأويل","بصر","يعقل"],
+    "P": ["قال","امر","فعل","ذهب","جاء","ارسل","دخل"],
+    "T": ["فاز","نجا","خسر","اصبح","عاد","كان"]
 }
 
+fields = ["Z","V","K","P","T"]
+
 # -------------------------
-# Functions
+# 🔥 1. تنظيف النص
+# -------------------------
+def normalize(text):
+    text = text.lower()
+    text = re.sub(r'[ًٌٍَُِّْـ]', '', text)   # إزالة التشكيل
+    text = re.sub(r'[^\w\s]', '', text)      # إزالة الرموز
+    text = text.replace("أ","ا").replace("إ","ا").replace("آ","ا")
+    text = text.replace("ى","ي").replace("ة","ه")
+    return text
+
+# -------------------------
+# 🔥 2. مطابقة مرنة
+# -------------------------
+def match_word(text, word):
+    return word in text
+
+# -------------------------
+# 🔥 3. حساب الدرجات
 # -------------------------
 def score_text(text):
+    text = normalize(text)
+
     scores = {}
     for field, words in lexicon.items():
-        scores[field] = sum(1 for w in words if w in text)
+        scores[field] = sum(1 for w in words if match_word(text, w))
     return scores
 
+# -------------------------
+# تحليل النص
+# -------------------------
 def analyze_text(text):
     verses = [v.strip() for v in text.split("\n") if v.strip()]
-    
+
     data = []
     for i, v in enumerate(verses):
         scores = score_text(v)
-        scores["ctu"] = i+1
+        scores["ctu"] = i + 1
         data.append(scores)
 
     df = pd.DataFrame(data)
     return df
 
-def compute_entropy(matrix):
-    probs = matrix.values.flatten()
-    probs = probs[probs > 0]
-    probs = probs / probs.sum()
-    return entropy(probs)
-
+# -------------------------
+# مصفوفة الانتقال
+# -------------------------
 def build_transition(df):
-    fields = ["Z","V","K","P","T"]
     transitions = []
 
     for i in range(len(df)-1):
@@ -75,10 +89,22 @@ def build_transition(df):
     return matrix
 
 # -------------------------
-# Input
+# Entropy
 # -------------------------
-text_input = st.text_area("Paste Qur'anic text here:")
+def compute_entropy(matrix):
+    probs = matrix.values.flatten()
+    probs = probs[probs > 0]
+    probs = probs / probs.sum()
+    return entropy(probs)
 
+# -------------------------
+# إدخال النص
+# -------------------------
+text_input = st.text_area("ضع نص السورة هنا (كل آية في سطر):")
+
+# -------------------------
+# التشغيل
+# -------------------------
 if text_input:
 
     df = analyze_text(text_input)
@@ -86,21 +112,21 @@ if text_input:
     st.subheader("CTU Data")
     st.write(df)
 
-    # Stats
-    corr_KP = df["K"].corr(df["P"])
-    corr_KT = df["K"].corr(df["T"])
-
+    # إحصائيات
     st.subheader("Statistics")
-    st.write("Correlation K-P:", corr_KP)
-    st.write("Correlation K-T:", corr_KT)
 
-    # Transition
+    if len(df) > 1:
+        st.write("Correlation K-P:", df["K"].corr(df["P"]))
+        st.write("Correlation K-T:", df["K"].corr(df["T"]))
+
+    # مصفوفة
     matrix = build_transition(df)
 
     st.subheader("Transition Matrix")
     st.write(matrix)
 
     # Heatmap
+    st.subheader("Heatmap")
     fig, ax = plt.subplots()
     sns.heatmap(matrix, annot=True, ax=ax)
     st.pyplot(fig)
@@ -110,7 +136,9 @@ if text_input:
     st.write("Entropy:", H)
 
     # Graph
+    st.subheader("Network Graph")
     G = nx.DiGraph()
+
     for i in matrix.index:
         for j in matrix.columns:
             if matrix.loc[i,j] > 0:
