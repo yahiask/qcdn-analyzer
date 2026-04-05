@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 from collections import Counter
 from scipy.stats import entropy
 import networkx as nx
@@ -11,22 +10,22 @@ import re
 # -------------------------
 # واجهة
 # -------------------------
-st.title("QCDN Analyzer - Cognitive Qur'anic Model (Enhanced)")
+st.title("QCDN Analyzer - Cognitive Qur'anic Model (Weighted)")
 
 # -------------------------
-# Lexicon (مُحسَّن علميًا)
+# Lexicon (موحد = كله dict لتفادي الأخطاء)
 # -------------------------
 lexicon = {
-    "Z": ["اذ","حين","لما"],
-    "V": ["حزن","كيد","حب","ظلم"],
+    "Z": {"اذ":1, "حين":1, "لما":1},
+    "V": {"حزن":1, "كيد":2, "حب":1, "ظلم":2},
     "K": {
-    "علم":1, "يعلم":1, "تعلم":1, "تعليم":1,
-    "عرف":1, "يعرف":1,
-    "رأى":2, "يرى":2, "بصر":2,
-    "رؤيا":3, "تأويل":3
-}
-    "P": ["قال","امر","جاء","ارسل"],
-    "T": ["نجا","ملك","سجن"]
+        "علم":1, "يعلم":1, "تعلم":1,
+        "عرف":1, "يعرف":1,
+        "رأى":2, "يرى":2,
+        "رؤيا":3, "تأويل":3
+    },
+    "P": {"قال":1, "امر":1, "جاء":1, "ارسل":1},
+    "T": {"نجا":2, "ملك":2, "سجن":2}
 }
 
 fields = ["Z","V","K","P","T"]
@@ -43,23 +42,18 @@ def normalize(text):
     return text
 
 # -------------------------
-# مطابقة مرنة
-# -------------------------
-def match_word(text, word):
-    return word in text
-
-# -------------------------
-# حساب الحقول
+# حساب الحقول (Weighted)
 # -------------------------
 def score_text(text):
     text = normalize(text)
     scores = {}
 
     for field, words in lexicon.items():
-        if isinstance(words, dict):
-            scores[field] = sum(weight for w, weight in words.items() if w in text)
-        else:
-            scores[field] = sum(1 for w in words if w in text)
+        score = 0
+        for w, weight in words.items():
+            if w in text:
+                score += weight
+        scores[field] = score
 
     return scores
 
@@ -75,11 +69,10 @@ def analyze_text(text):
         scores["ctu"] = i + 1
         data.append(scores)
 
-    df = pd.DataFrame(data)
-    return df
+    return pd.DataFrame(data)
 
 # -------------------------
-# مصفوفة الانتقال بين الآيات
+# انتقال بين الآيات
 # -------------------------
 def build_transition(df):
     transitions = []
@@ -98,13 +91,14 @@ def build_transition(df):
     return matrix
 
 # -------------------------
-# 🔥 العلاقات داخل الآية (الأهم)
+# 🔥 العلاقات داخل الآية
 # -------------------------
 def co_occurrence(df):
     co_matrix = pd.DataFrame(0, index=fields, columns=fields)
 
     for _, row in df.iterrows():
         active = [f for f in fields if row[f] > 0]
+
         for i in active:
             for j in active:
                 if i != j:
@@ -116,15 +110,17 @@ def co_occurrence(df):
 # Entropy
 # -------------------------
 def compute_entropy(matrix):
-    probs = matrix.values.flatten()
-    probs = probs[probs > 0]
-    probs = probs / probs.sum()
+    values = matrix.values.flatten()
+    values = values[values > 0]
+    if len(values) == 0:
+        return 0
+    probs = values / values.sum()
     return entropy(probs)
 
 # -------------------------
 # إدخال النص
 # -------------------------
-text_input = st.text_area("ضع النص هنا (كل آية أو جملة في سطر):")
+text_input = st.text_area("ضع النص هنا (كل آية في سطر):")
 
 # -------------------------
 # تشغيل التحليل
@@ -145,11 +141,11 @@ if text_input:
         st.write("Correlation K-T:", df["K"].corr(df["T"]))
 
     # -------------------------
-    # الانتقال بين الآيات
+    # الانتقال
     # -------------------------
     matrix = build_transition(df)
 
-    st.subheader("Transition Matrix (بين الآيات)")
+    st.subheader("Transition Matrix")
     st.write(matrix)
 
     fig, ax = plt.subplots()
@@ -161,12 +157,12 @@ if text_input:
     # -------------------------
     co_mat = co_occurrence(df)
 
-    st.subheader("Co-occurrence Matrix (داخل الآية)")
+    st.subheader("Co-occurrence Matrix")
     st.write(co_mat)
 
-    fig_co, ax_co = plt.subplots()
-    sns.heatmap(co_mat, annot=True, ax=ax_co)
-    st.pyplot(fig_co)
+    fig2, ax2 = plt.subplots()
+    sns.heatmap(co_mat, annot=True, ax=ax2)
+    st.pyplot(fig2)
 
     # -------------------------
     # Entropy
@@ -185,7 +181,7 @@ if text_input:
             if matrix.loc[i,j] > 0:
                 G.add_edge(i, j, weight=matrix.loc[i,j])
 
-    fig2, ax2 = plt.subplots()
+    fig3, ax3 = plt.subplots()
     pos = nx.spring_layout(G)
-    nx.draw(G, pos, with_labels=True, ax=ax2)
-    st.pyplot(fig2)
+    nx.draw(G, pos, with_labels=True, ax=ax3)
+    st.pyplot(fig3)
