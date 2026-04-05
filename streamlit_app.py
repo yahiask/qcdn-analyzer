@@ -11,20 +11,20 @@ import re
 # -------------------------
 # واجهة
 # -------------------------
-st.title("QCDN Analyzer - Qur'anic Cognitive Network (Fixed Version)")
+st.title("QCDN Analyzer - Cognitive Qur'anic Model (Enhanced)")
 
 # -------------------------
-# Lexicon (محسن)
+# Lexicon (مُحسَّن علميًا)
 # -------------------------
 lexicon = {
     "Z": ["اذ","حين","لما"],
     "V": ["حزن","كيد","حب","ظلم"],
-    "K":  [
-    "علم","يعلم","تعلم","تعليم",
-    "عرف","يعرف","معرفه",
-    "رأى","يرى","بصر",
-    "رؤيا","تأويل"
-],
+    "K": [
+        "علم","يعلم","تعلم","تعليم",
+        "عرف","يعرف","معرفه",
+        "رأى","يرى","بصر",
+        "رؤيا","تأويل"
+    ],
     "P": ["قال","امر","جاء","ارسل"],
     "T": ["نجا","ملك","سجن"]
 }
@@ -32,24 +32,24 @@ lexicon = {
 fields = ["Z","V","K","P","T"]
 
 # -------------------------
-# 🔥 1. تنظيف النص
+# تنظيف النص
 # -------------------------
 def normalize(text):
     text = text.lower()
-    text = re.sub(r'[ًٌٍَُِّْـ]', '', text)   # إزالة التشكيل
-    text = re.sub(r'[^\w\s]', '', text)      # إزالة الرموز
+    text = re.sub(r'[ًٌٍَُِّْـ]', '', text)
+    text = re.sub(r'[^\w\s]', '', text)
     text = text.replace("أ","ا").replace("إ","ا").replace("آ","ا")
     text = text.replace("ى","ي").replace("ة","ه")
     return text
 
 # -------------------------
-# 🔥 2. مطابقة مرنة
+# مطابقة مرنة
 # -------------------------
 def match_word(text, word):
     return word in text
 
 # -------------------------
-# 🔥 3. حساب الدرجات
+# حساب الحقول
 # -------------------------
 def score_text(text):
     text = normalize(text)
@@ -75,7 +75,7 @@ def analyze_text(text):
     return df
 
 # -------------------------
-# مصفوفة الانتقال
+# مصفوفة الانتقال بين الآيات
 # -------------------------
 def build_transition(df):
     transitions = []
@@ -94,6 +94,21 @@ def build_transition(df):
     return matrix
 
 # -------------------------
+# 🔥 العلاقات داخل الآية (الأهم)
+# -------------------------
+def co_occurrence(df):
+    co_matrix = pd.DataFrame(0, index=fields, columns=fields)
+
+    for _, row in df.iterrows():
+        active = [f for f in fields if row[f] > 0]
+        for i in active:
+            for j in active:
+                if i != j:
+                    co_matrix.loc[i, j] += 1
+
+    return co_matrix
+
+# -------------------------
 # Entropy
 # -------------------------
 def compute_entropy(matrix):
@@ -105,10 +120,10 @@ def compute_entropy(matrix):
 # -------------------------
 # إدخال النص
 # -------------------------
-text_input = st.text_area("ضع نص السورة هنا (كل آية في سطر):")
+text_input = st.text_area("ضع النص هنا (كل آية أو جملة في سطر):")
 
 # -------------------------
-# التشغيل
+# تشغيل التحليل
 # -------------------------
 if text_input:
 
@@ -117,33 +132,50 @@ if text_input:
     st.subheader("CTU Data")
     st.write(df)
 
+    # -------------------------
     # إحصائيات
+    # -------------------------
     st.subheader("Statistics")
-
     if len(df) > 1:
         st.write("Correlation K-P:", df["K"].corr(df["P"]))
         st.write("Correlation K-T:", df["K"].corr(df["T"]))
 
-    # مصفوفة
+    # -------------------------
+    # الانتقال بين الآيات
+    # -------------------------
     matrix = build_transition(df)
 
-    st.subheader("Transition Matrix")
+    st.subheader("Transition Matrix (بين الآيات)")
     st.write(matrix)
 
-    # Heatmap
-    st.subheader("Heatmap")
     fig, ax = plt.subplots()
     sns.heatmap(matrix, annot=True, ax=ax)
     st.pyplot(fig)
 
+    # -------------------------
+    # 🔥 العلاقات داخل الآية
+    # -------------------------
+    co_mat = co_occurrence(df)
+
+    st.subheader("Co-occurrence Matrix (داخل الآية)")
+    st.write(co_mat)
+
+    fig_co, ax_co = plt.subplots()
+    sns.heatmap(co_mat, annot=True, ax=ax_co)
+    st.pyplot(fig_co)
+
+    # -------------------------
     # Entropy
+    # -------------------------
     H = compute_entropy(matrix)
     st.write("Entropy:", H)
 
-    # Graph
+    # -------------------------
+    # الشبكة
+    # -------------------------
     st.subheader("Network Graph")
-    G = nx.DiGraph()
 
+    G = nx.DiGraph()
     for i in matrix.index:
         for j in matrix.columns:
             if matrix.loc[i,j] > 0:
