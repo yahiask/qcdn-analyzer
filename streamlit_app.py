@@ -20,11 +20,11 @@ lexicon = {
     "Z": ["اذ","حين","لما"],
     "V": ["حزن","كيد","حب","ظلم"],
     "K": [
-        "علم","يعلم","تعلم","تعليم",
-        "عرف","يعرف","معرفه",
-        "رأى","يرى","بصر",
-        "رؤيا","تأويل"
-    ],
+    "علم":1, "يعلم":1, "تعلم":1, "تعليم":1,
+    "عرف":1, "يعرف":1,
+    "رأى":2, "يرى":2, "بصر":2,
+    "رؤيا":3, "تأويل":3
+],
     "P": ["قال","امر","جاء","ارسل"],
     "T": ["نجا","ملك","سجن"]
 }
@@ -53,10 +53,14 @@ def match_word(text, word):
 # -------------------------
 def score_text(text):
     text = normalize(text)
-
     scores = {}
+
     for field, words in lexicon.items():
-        scores[field] = sum(1 for w in words if match_word(text, w))
+        if isinstance(words, dict):
+            scores[field] = sum(weight for w, weight in words.items() if w in text)
+        else:
+            scores[field] = sum(1 for w in words if w in text)
+
     return scores
 
 # -------------------------
