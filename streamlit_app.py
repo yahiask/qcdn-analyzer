@@ -190,11 +190,10 @@ if text_input:
     # -------------------------
     # 🔥 Chains
     # -------------------------
-    chain_count = chain_K_P_T(df)
+   chain_count = chain_K_P_T_flexible(df)
 
-    st.subheader("K → P → T Chains")
-    st.write("Count:", chain_count)
-
+st.subheader("Flexible K → P → T Chains")
+st.write("Count:", chain_count)
     # -------------------------
     # Entropy
     # -------------------------
