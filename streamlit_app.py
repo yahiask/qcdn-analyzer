@@ -110,19 +110,19 @@ def co_occurrence(df):
 # -------------------------
 # 🔥 Chains K → P → T
 # -------------------------
-def chain_K_P_T(df):
+def chain_K_P_T_flexible(df, window=4):
     count = 0
 
-    if len(df) < 3:
-        return 0
+    for i in range(len(df)):
+        if df.iloc[i]["K"] > 0:
 
-    for i in range(len(df) - 2):
-        if (
-            df.iloc[i]["K"] > 0 and
-            df.iloc[i+1]["P"] > 0 and
-            df.iloc[i+2]["T"] > 0
-        ):
-            count += 1
+            for j in range(i+1, min(i+window, len(df))):
+                if df.iloc[j]["P"] > 0:
+
+                    for k in range(j+1, min(j+window, len(df))):
+                        if df.iloc[k]["T"] > 0:
+                            count += 1
+                            break
 
     return count
 
