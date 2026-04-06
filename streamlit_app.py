@@ -10,7 +10,7 @@ import re
 # -------------------------
 # واجهة
 # -------------------------
-st.title("QCDN Analyzer - Cognitive Qur'anic Model (Final)")
+st.title("QCDN Analyzer - Cognitive Qur'anic Model (Stable)")
 
 # -------------------------
 # Lexicon (Weighted)
@@ -25,7 +25,16 @@ lexicon = {
         "رؤيا":3, "تأويل":3
     },
     "P": {"قال":1, "امر":1, "جاء":1, "ارسل":1},
-    "T": {"نجا":2, "ملك":2, "سجن":2}
+    "T": {
+        "نجا":2, "نجي":2,
+        "ملك":2, "الملك":2,
+        "سجن":2, "السجن":2,
+        "خرج":2, "دخل":2,
+        "مكن":3, "مكنا":3,
+        "رفع":2,
+        "بدل":2,
+        "جاء":1
+    }
 }
 
 fields = ["Z","V","K","P","T"]
@@ -58,14 +67,15 @@ def score_text(text):
     return scores
 
 # -------------------------
-# تحليل بالسياق (window)
+# تحليل بالسياق
 # -------------------------
 def analyze_text(text, window=2):
     verses = [v.strip() for v in text.split("\n") if v.strip()]
-
     data = []
+
     for i in range(len(verses)):
-        context = " ".join(verses[max(0, i-window): i+1])
+        start = max(0, i - window)
+        context = " ".join(verses[start:i+1])
         scores = score_text(context)
         scores["ctu"] = i + 1
         data.append(scores)
@@ -78,7 +88,7 @@ def analyze_text(text, window=2):
 def build_transition(df):
     transitions = []
 
-    for i in range(len(df)-1):
+    for i in range(len(df) - 1):
         current = df.iloc[i][fields].idxmax()
         nxt = df.iloc[i+1][fields].idxmax()
         transitions.append((current, nxt))
@@ -86,8 +96,8 @@ def build_transition(df):
     counts = Counter(transitions)
     matrix = pd.DataFrame(0, index=fields, columns=fields)
 
-    for (i,j), c in counts.items():
-        matrix.loc[i,j] = c
+    for (i, j), c in counts.items():
+        matrix.loc[i, j] = c
 
     return matrix
 
@@ -108,18 +118,22 @@ def co_occurrence(df):
     return co_matrix
 
 # -------------------------
-# 🔥 Chains K → P → T
+# 🔥 Flexible Chains (آمن)
 # -------------------------
 def chain_K_P_T_flexible(df, window=4):
     count = 0
+    n = len(df)
 
-    for i in range(len(df)):
+    if n < 3:
+        return 0
+
+    for i in range(n):
         if df.iloc[i]["K"] > 0:
 
-            for j in range(i+1, min(i+window, len(df))):
+            for j in range(i+1, min(i+window, n)):
                 if df.iloc[j]["P"] > 0:
 
-                    for k in range(j+1, min(j+window, len(df))):
+                    for k in range(j+1, min(j+window, n)):
                         if df.iloc[k]["T"] > 0:
                             count += 1
                             break
@@ -188,12 +202,13 @@ if text_input:
     st.pyplot(fig2)
 
     # -------------------------
-    # 🔥 Chains
+    # 🔥 Flexible Chains
     # -------------------------
-   chain_count = chain_K_P_T_flexible(df)
+    chain_count = chain_K_P_T_flexible(df)
 
-st.subheader("Flexible K → P → T Chains")
-st.write("Count:", chain_count)
+    st.subheader("Flexible K → P → T Chains")
+    st.write("Count:", chain_count)
+
     # -------------------------
     # Entropy
     # -------------------------
