@@ -60,12 +60,13 @@ def score_text(text):
 # -------------------------
 # تحليل النص
 # -------------------------
-def analyze_text(text):
+def analyze_text(text, window=2):
     verses = [v.strip() for v in text.split("\n") if v.strip()]
 
     data = []
-    for i, v in enumerate(verses):
-        scores = score_text(v)
+    for i in range(len(verses)):
+        context = " ".join(verses[max(0, i-window): i+1])
+        scores = score_text(context)
         scores["ctu"] = i + 1
         data.append(scores)
 
