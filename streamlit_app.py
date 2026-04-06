@@ -10,10 +10,10 @@ import re
 # -------------------------
 # واجهة
 # -------------------------
-st.title("QCDN Analyzer - Cognitive Qur'anic Model (Weighted)")
+st.title("QCDN Analyzer - Cognitive Qur'anic Model (Final)")
 
 # -------------------------
-# Lexicon (موحد = كله dict لتفادي الأخطاء)
+# Lexicon (Weighted)
 # -------------------------
 lexicon = {
     "Z": {"اذ":1, "حين":1, "لما":1},
@@ -42,7 +42,7 @@ def normalize(text):
     return text
 
 # -------------------------
-# حساب الحقول (Weighted)
+# حساب الدرجات
 # -------------------------
 def score_text(text):
     text = normalize(text)
@@ -58,7 +58,7 @@ def score_text(text):
     return scores
 
 # -------------------------
-# تحليل النص
+# تحليل بالسياق (window)
 # -------------------------
 def analyze_text(text, window=2):
     verses = [v.strip() for v in text.split("\n") if v.strip()]
@@ -73,7 +73,7 @@ def analyze_text(text, window=2):
     return pd.DataFrame(data)
 
 # -------------------------
-# انتقال بين الآيات
+# Transition
 # -------------------------
 def build_transition(df):
     transitions = []
@@ -92,7 +92,7 @@ def build_transition(df):
     return matrix
 
 # -------------------------
-# 🔥 العلاقات داخل الآية
+# Co-occurrence
 # -------------------------
 def co_occurrence(df):
     co_matrix = pd.DataFrame(0, index=fields, columns=fields)
@@ -108,13 +108,34 @@ def co_occurrence(df):
     return co_matrix
 
 # -------------------------
+# 🔥 Chains K → P → T
+# -------------------------
+def chain_K_P_T(df):
+    count = 0
+
+    if len(df) < 3:
+        return 0
+
+    for i in range(len(df) - 2):
+        if (
+            df.iloc[i]["K"] > 0 and
+            df.iloc[i+1]["P"] > 0 and
+            df.iloc[i+2]["T"] > 0
+        ):
+            count += 1
+
+    return count
+
+# -------------------------
 # Entropy
 # -------------------------
 def compute_entropy(matrix):
     values = matrix.values.flatten()
     values = values[values > 0]
+
     if len(values) == 0:
         return 0
+
     probs = values / values.sum()
     return entropy(probs)
 
@@ -124,7 +145,7 @@ def compute_entropy(matrix):
 text_input = st.text_area("ضع النص هنا (كل آية في سطر):")
 
 # -------------------------
-# تشغيل التحليل
+# تشغيل
 # -------------------------
 if text_input:
 
@@ -134,15 +155,16 @@ if text_input:
     st.write(df)
 
     # -------------------------
-    # إحصائيات
+    # Statistics
     # -------------------------
     st.subheader("Statistics")
+
     if len(df) > 1:
         st.write("Correlation K-P:", df["K"].corr(df["P"]))
         st.write("Correlation K-T:", df["K"].corr(df["T"]))
 
     # -------------------------
-    # الانتقال
+    # Transition
     # -------------------------
     matrix = build_transition(df)
 
@@ -154,7 +176,7 @@ if text_input:
     st.pyplot(fig)
 
     # -------------------------
-    # 🔥 العلاقات داخل الآية
+    # Co-occurrence
     # -------------------------
     co_mat = co_occurrence(df)
 
@@ -166,21 +188,30 @@ if text_input:
     st.pyplot(fig2)
 
     # -------------------------
+    # 🔥 Chains
+    # -------------------------
+    chain_count = chain_K_P_T(df)
+
+    st.subheader("K → P → T Chains")
+    st.write("Count:", chain_count)
+
+    # -------------------------
     # Entropy
     # -------------------------
     H = compute_entropy(matrix)
     st.write("Entropy:", H)
 
     # -------------------------
-    # الشبكة
+    # Network
     # -------------------------
     st.subheader("Network Graph")
 
     G = nx.DiGraph()
+
     for i in matrix.index:
         for j in matrix.columns:
-            if matrix.loc[i,j] > 0:
-                G.add_edge(i, j, weight=matrix.loc[i,j])
+            if matrix.loc[i, j] > 0:
+                G.add_edge(i, j, weight=matrix.loc[i, j])
 
     fig3, ax3 = plt.subplots()
     pos = nx.spring_layout(G)
