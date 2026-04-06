@@ -10,10 +10,10 @@ import re
 # -------------------------
 # واجهة
 # -------------------------
-st.title("QCDN Analyzer - Cognitive Qur'anic Model (Stable)")
+st.title("QCDN Analyzer - Final Stable Model")
 
 # -------------------------
-# Lexicon (Weighted)
+# Lexicon
 # -------------------------
 lexicon = {
     "Z": {"اذ":1, "حين":1, "لما":1},
@@ -40,7 +40,7 @@ lexicon = {
 fields = ["Z","V","K","P","T"]
 
 # -------------------------
-# تنظيف النص
+# Normalize
 # -------------------------
 def normalize(text):
     text = text.lower()
@@ -51,7 +51,7 @@ def normalize(text):
     return text
 
 # -------------------------
-# حساب الدرجات
+# Score
 # -------------------------
 def score_text(text):
     text = normalize(text)
@@ -67,7 +67,7 @@ def score_text(text):
     return scores
 
 # -------------------------
-# تحليل بالسياق
+# Context Analysis
 # -------------------------
 def analyze_text(text, window=2):
     verses = [v.strip() for v in text.split("\n") if v.strip()]
@@ -118,10 +118,10 @@ def co_occurrence(df):
     return co_matrix
 
 # -------------------------
-# 🔥 Flexible Chains (آمن)
+# 🔥 Unique Chains (Fixed)
 # -------------------------
-def chain_K_P_T_flexible(df, window=4):
-    count = 0
+def chain_K_P_T_unique(df, window=4):
+    chains = set()
     n = len(df)
 
     if n < 3:
@@ -135,10 +135,10 @@ def chain_K_P_T_flexible(df, window=4):
 
                     for k in range(j+1, min(j+window, n)):
                         if df.iloc[k]["T"] > 0:
-                            count += 1
+                            chains.add((i, j, k))
                             break
 
-    return count
+    return len(chains)
 
 # -------------------------
 # Entropy
@@ -154,12 +154,12 @@ def compute_entropy(matrix):
     return entropy(probs)
 
 # -------------------------
-# إدخال النص
+# Input
 # -------------------------
 text_input = st.text_area("ضع النص هنا (كل آية في سطر):")
 
 # -------------------------
-# تشغيل
+# Run
 # -------------------------
 if text_input:
 
@@ -167,6 +167,23 @@ if text_input:
 
     st.subheader("CTU Data")
     st.write(df)
+
+    # -------------------------
+    # Chains (Unique)
+    # -------------------------
+    chains = chain_K_P_T_unique(df)
+
+    # -------------------------
+    # CDD (Normalized)
+    # -------------------------
+    if len(df) > 0:
+        CDD = chains / len(df)
+    else:
+        CDD = 0
+
+    st.subheader("Cognitive Dynamic Density (CDD)")
+    st.write("Chains:", chains)
+    st.write("CDD:", CDD)
 
     # -------------------------
     # Statistics
@@ -200,14 +217,6 @@ if text_input:
     fig2, ax2 = plt.subplots()
     sns.heatmap(co_mat, annot=True, ax=ax2)
     st.pyplot(fig2)
-
-    # -------------------------
-    # 🔥 Flexible Chains
-    # -------------------------
-    chain_count = chain_K_P_T_flexible(df)
-
-    st.subheader("Flexible K → P → T Chains")
-    st.write("Count:", chain_count)
 
     # -------------------------
     # Entropy
