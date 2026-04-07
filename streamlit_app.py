@@ -10,58 +10,67 @@ import re
 # -------------------------
 # واجهة
 # -------------------------
-st.title("QCDN Analyzer - Final Stable Model")
-
-# -------------------------
-# Lexicon
-# -------------------------
-lexicon = {
-    "Z": {"اذ":1, "حين":1, "لما":1},
-    "V": {"حزن":1, "كيد":2, "حب":1, "ظلم":2},
-    "K": {
-        "علم":1, "يعلم":1, "تعلم":1,
-        "عرف":1, "يعرف":1,
-        "رأى":2, "يرى":2,
-        "رؤيا":3, "تأويل":3
-    },
-    "P": {"قال":1, "امر":1, "جاء":1, "ارسل":1},
-    "T": {
-        "نجا":2, "نجي":2,
-        "ملك":2, "الملك":2,
-        "سجن":2, "السجن":2,
-        "خرج":2, "دخل":2,
-        "مكن":3, "مكنا":3,
-        "رفع":2,
-        "بدل":2,
-        "جاء":1
-    }
-}
-
-fields = ["Z","V","K","P","T"]
+st.title("QCDN Analyzer - Semantic Model (Final Safe Version)")
 
 # -------------------------
 # Normalize
 # -------------------------
 def normalize(text):
     text = text.lower()
+
+    # إزالة التشكيل
     text = re.sub(r'[ًٌٍَُِّْـ]', '', text)
-    text = re.sub(r'[^\w\s]', '', text)
+
+    # توحيد الحروف
     text = text.replace("أ","ا").replace("إ","ا").replace("آ","ا")
     text = text.replace("ى","ي").replace("ة","ه")
+
+    # إزالة الرموز
+    text = re.sub(r'[^\w\s]', ' ', text)
+
     return text
 
 # -------------------------
-# Score
+# Semantic Lexicon
 # -------------------------
-def score_text(text):
+semantic_lexicon = {
+
+    "K": [
+        "علم","يعلم","عرف","ادرك","فهم","يرى","رأى","تبين","درا","شعر"
+    ],
+
+    "P": [
+        "قال","يقول","امر","دعا","سأل","ذهب","فعل","عمل","ارسل","جاء"
+    ],
+
+    "T": [
+        "اصبح","صار","نجا","هلك","تغير","حدث","وقع","تحقق","دخل","خرج"
+    ],
+
+    "V": [
+        "خاف","حزن","فرح","غضب","كره","احب","ضاق"
+    ],
+
+    "Z": [
+        "اذ","حين","لما","بعد","قبل","ثم","حتى"
+    ]
+}
+
+fields = ["Z","V","K","P","T"]
+
+# -------------------------
+# Semantic Scoring (Safe Matching)
+# -------------------------
+def semantic_score(text):
     text = normalize(text)
+    words_in_text = text.split()
     scores = {}
 
-    for field, words in lexicon.items():
+    for field, lex_words in semantic_lexicon.items():
         score = 0
-        for w, weight in words.items():
-            if w in text:
-                score += weight
+        for w in lex_words:
+            if w in words_in_text:
+                score += 1
         scores[field] = score
 
     return scores
@@ -70,20 +79,20 @@ def score_text(text):
 # Context Analysis
 # -------------------------
 def analyze_text(text, window=2):
-    verses = [v.strip() for v in text.split("\n") if v.strip()]
+    units = [u.strip() for u in text.split("\n") if u.strip()]
     data = []
 
-    for i in range(len(verses)):
+    for i in range(len(units)):
         start = max(0, i - window)
-        context = " ".join(verses[start:i+1])
-        scores = score_text(context)
+        context = " ".join(units[start:i+1])
+        scores = semantic_score(context)
         scores["ctu"] = i + 1
         data.append(scores)
 
     return pd.DataFrame(data)
 
 # -------------------------
-# Transition
+# Transition Matrix
 # -------------------------
 def build_transition(df):
     transitions = []
@@ -118,7 +127,7 @@ def co_occurrence(df):
     return co_matrix
 
 # -------------------------
-# 🔥 Unique Chains (Fixed)
+# Unique Chains
 # -------------------------
 def chain_K_P_T_unique(df, window=4):
     chains = set()
@@ -156,7 +165,7 @@ def compute_entropy(matrix):
 # -------------------------
 # Input
 # -------------------------
-text_input = st.text_area("ضع النص هنا (كل آية في سطر):")
+text_input = st.text_area("ضع النص (كل جملة أو آية في سطر):")
 
 # -------------------------
 # Run
@@ -168,35 +177,17 @@ if text_input:
     st.subheader("CTU Data")
     st.write(df)
 
-    # -------------------------
-    # Chains (Unique)
-    # -------------------------
+    # Chains
     chains = chain_K_P_T_unique(df)
 
-    # -------------------------
-    # CDD (Normalized)
-    # -------------------------
-    if len(df) > 0:
-        CDD = chains / len(df)
-    else:
-        CDD = 0
+    # CDD
+    CDD = chains / len(df) if len(df) > 0 else 0
 
     st.subheader("Cognitive Dynamic Density (CDD)")
     st.write("Chains:", chains)
     st.write("CDD:", CDD)
 
-    # -------------------------
-    # Statistics
-    # -------------------------
-    st.subheader("Statistics")
-
-    if len(df) > 1:
-        st.write("Correlation K-P:", df["K"].corr(df["P"]))
-        st.write("Correlation K-T:", df["K"].corr(df["T"]))
-
-    # -------------------------
     # Transition
-    # -------------------------
     matrix = build_transition(df)
 
     st.subheader("Transition Matrix")
@@ -206,9 +197,7 @@ if text_input:
     sns.heatmap(matrix, annot=True, ax=ax)
     st.pyplot(fig)
 
-    # -------------------------
     # Co-occurrence
-    # -------------------------
     co_mat = co_occurrence(df)
 
     st.subheader("Co-occurrence Matrix")
@@ -218,15 +207,11 @@ if text_input:
     sns.heatmap(co_mat, annot=True, ax=ax2)
     st.pyplot(fig2)
 
-    # -------------------------
     # Entropy
-    # -------------------------
     H = compute_entropy(matrix)
     st.write("Entropy:", H)
 
-    # -------------------------
     # Network
-    # -------------------------
     st.subheader("Network Graph")
 
     G = nx.DiGraph()
